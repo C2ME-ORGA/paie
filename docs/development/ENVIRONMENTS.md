@@ -252,20 +252,47 @@ cd /www/wwwroot/paie.c2me
 # 1. Supprimer le cache de configuration (obligatoire avant la migration)
 php artisan config:clear
 
-# 2. Migrer avec les identifiants du compte de déploiement
-#    (tant que la configuration n'est pas mise en cache, les variables
-#    d'environnement du shell sont prioritaires sur .env)
-DB_USERNAME=batipaie_deploy \
-DB_PASSWORD='<mot de passe de déploiement>' \
-php artisan migrate --force
+# 2. Saisir le mot de passe sans affichage et sans argument de commande.
+#    Le nom de compte n'est pas un secret ; le mot de passe n'apparaît ni dans
+#    l'historique du shell ni dans la liste des processus (`ps`).
+export DB_USERNAME=batipaie_deploy
+read -r -s -p "Mot de passe de batipaie_deploy : " DB_PASSWORD
+echo
+export DB_PASSWORD
 
-# 3. Reconstruire le cache de production avec le compte runtime (.env)
-php artisan optimize
+# 3. Migrer (les variables exportées priment sur .env tant que la
+#    configuration n'est pas mise en cache)
+php artisan migrate --force
+MIGRATION_STATUS=$?
+
+# 4. Supprimer immédiatement les identifiants de l'environnement du shell
+unset DB_USERNAME DB_PASSWORD
+
+# 5. Reconstruire le cache de production avec le compte runtime (.env),
+#    uniquement si la migration a réussi
+if [ "$MIGRATION_STATUS" -eq 0 ]; then
+    php artisan optimize
+fi
+
+# 6. Vérifier l'état (lecture seule, avec le compte runtime)
+php artisan migrate:status
 ```
 
+- **Ne jamais** écrire le mot de passe dans la commande
+  (`DB_PASSWORD='…' php artisan migrate`) : il serait visible dans l'historique du
+  shell et dans `ps`.
+- `read -s` n'affiche pas la saisie et ne l'enregistre pas dans l'historique.
+- Cette saisie suppose une **session interactive** : elle n'est pas utilisable
+  telle quelle depuis un cron ou une CI (prévoir un mécanisme de secrets dédié si
+  l'automatisation devient nécessaire).
+- `unset` doit être exécuté **avant** `optimize` : la reconstruction du cache ne
+  doit jamais se faire avec les identifiants de déploiement.
+- Ne jamais écrire le mot de passe de déploiement dans le `.env` runtime, dans un
+  fichier versionné, dans un log ou dans une trace (`set -x`).
 - **Variante isolée** : créer un fichier `.env.deploy` (copie de `.env` avec les
-  identifiants `batipaie_deploy` et **le même `APP_KEY`**), exécuter
-  `php artisan migrate --force --env=deploy`, puis supprimer `.env.deploy`.
+  identifiants `batipaie_deploy` et **le même `APP_KEY`**), permissions `600`,
+  exécuter `php artisan migrate --force --env=deploy`, puis supprimer
+  immédiatement `.env.deploy`. Ne jamais versionner ce fichier.
 - **Ne jamais** lancer `optimize` ni `config:cache` pendant que les identifiants de
   déploiement sont exportés : le cache figerait le compte de déploiement pour
   l'application.
@@ -358,21 +385,47 @@ sudo find storage bootstrap/cache -type f -exec chmod 664 {} \;
 
 ### 4.8 Planification (Cron)
 
-Le scheduler Laravel doit être appelé chaque minute par cron, **sous l'identité de
-l'utilisateur du site** (celui qui exécute PHP-FPM) et jamais par root : sinon les
-fichiers créés dans `storage/logs` et `storage/framework` appartiennent à root et
-PHP-FPM ne peut plus y écrire.
+Le scheduler Laravel doit être exécuté chaque minute, **sous l'identité de
+l'utilisateur du site** (celui qui exécute PHP-FPM, `www` dans les conventions
+aaPanel). Exécuté par root, il créerait des fichiers appartenant à root dans
+`storage/logs` et `storage/framework`, et PHP-FPM ne pourrait plus y écrire.
+
+Deux configurations sont possibles. **Le cas A est préférable** lorsqu'aaPanel
+permet de sélectionner directement l'utilisateur de la tâche.
+
+#### Cas A — tâche planifiée dans la crontab de `www` (recommandé)
+
+La tâche est enregistrée directement pour l'utilisateur `www` (par exemple
+`sudo crontab -u www -e`, ou l'option « Run as user » / l'utilisateur du site dans
+aaPanel). Aucun `sudo` n'est nécessaire :
+
+```cron
+* * * * * cd /www/wwwroot/paie.c2me && /usr/bin/php8.4 artisan schedule:run >> /dev/null 2>&1
+```
+
+#### Cas B — tâche planifiée dans la crontab de root
+
+Si la tâche est enregistrée dans la crontab de root (souvent la configuration par
+défaut d'un panneau), la commande doit déléguer explicitement l'exécution à `www` :
 
 ```cron
 * * * * * cd /www/wwwroot/paie.c2me && sudo -u www /usr/bin/php8.4 artisan schedule:run >> /dev/null 2>&1
 ```
 
-- Adapter le chemin du binaire PHP à la version installée par aaPanel.
-- Dans aaPanel, créer la tâche planifiée de type « Shell script » et, si l'option
-  existe, sélectionner l'utilisateur du site ; sinon conserver le préfixe
-  `sudo -u www`.
+- La délégation doit être autorisée et correctement configurée : root peut passer
+  à `www` par défaut ; si la tâche est exécutée par un autre compte, ajouter une
+  règle dédiée dans `/etc/sudoers.d/`, limitée à cette commande. Vérifier avec
+  `sudo -u www whoami` (doit répondre `www`).
 - La redirection vers `/dev/null` évite de créer un fichier de log appartenant à
   root ; consulter `storage/logs` pour le résultat.
+- Contrôler qu'aucun fichier de `storage/logs` ou `storage/framework` n'appartient
+  à root (`ls -l`) et corriger le cas échéant avec
+  `sudo chown -R www:www storage bootstrap/cache`.
+
+Dans les deux cas :
+
+- Adapter le chemin du binaire PHP à la version réellement installée par aaPanel ;
+  ne pas recopier un chemin d'installation supposé.
 - Vérifier l'exécution via `php artisan schedule:list` et les logs applicatifs.
 - Aucune tâche planifiée métier n'existe encore : la tâche est préparée pour la
   suite du projet.
@@ -424,21 +477,29 @@ git checkout <tag ou commit validé>    # jamais une branche de travail
 composer install --no-dev --optimize-autoloader
 npm ci && npm run build                # Node.js 24 requis sur le serveur
 
-# 1. Migrations avec le compte de déploiement (voir §4.4.2)
+# 1. Migrations avec le compte de déploiement (détail : §4.4.2)
 php artisan config:clear
-DB_USERNAME=batipaie_deploy \
-DB_PASSWORD='<mot de passe de déploiement>' \
+export DB_USERNAME=batipaie_deploy
+read -r -s -p "Mot de passe de batipaie_deploy : " DB_PASSWORD
+echo
+export DB_PASSWORD
 php artisan migrate --force
+MIGRATION_STATUS=$?
+unset DB_USERNAME DB_PASSWORD
 
-# 2. Reconstruction du cache de production avec le compte runtime
-php artisan optimize                   # config, routes, vues
+# 2. Reconstruction du cache de production avec le compte runtime, si la
+#    migration a réussi
+if [ "$MIGRATION_STATUS" -eq 0 ]; then
+    php artisan optimize               # config, routes, vues
+fi
+php artisan migrate:status             # vérification (lecture seule)
 php artisan filament:optimize
 php artisan queue:restart              # si workers actifs
 php artisan up
 ```
 
-- Exécuter ces commandes sous l'identité de l'utilisateur du site (`sudo -u www`)
-  ou rétablir ensuite `sudo chown -R www:www storage bootstrap/cache`, afin que
+- Exécuter ces commandes sous l'identité de l'utilisateur du site (voir §4.8) ou
+  rétablir ensuite `sudo chown -R www:www storage bootstrap/cache`, afin que
   PHP-FPM conserve l'accès en écriture.
 - Toujours sauvegarder la base avant une migration.
 - En cas d'erreur : `php artisan optimize:clear` pour diagnostiquer.
@@ -495,8 +556,10 @@ jamais de sa valeur.*
 - [ ] `composer install --no-dev --optimize-autoloader`
 - [ ] `npm ci && npm run build` (Node.js 24)
 - [ ] `php artisan config:clear`
-- [ ] `DB_USERNAME=batipaie_deploy … php artisan migrate --force` (compte de déploiement)
-- [ ] `php artisan optimize` + `php artisan filament:optimize` (compte runtime)
+- [ ] Mot de passe `batipaie_deploy` saisi sans affichage (`read -s`), puis `php artisan migrate --force` (§4.4.2)
+- [ ] `unset DB_USERNAME DB_PASSWORD` effectué après la migration
+- [ ] `php artisan optimize` + `php artisan filament:optimize` avec les identifiants runtime du `.env`
+- [ ] `php artisan migrate:status` (contrôle lecture seule)
 - [ ] `php artisan queue:restart`
 - [ ] `php artisan up`
 
