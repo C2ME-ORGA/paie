@@ -15,7 +15,7 @@ Stratégie officielle de promotion :
 
 `feat/*` / `fix/*` → `develop` → `master` → `production` → tags / GitHub Releases
 
-- `production` : état exact déployé en production. **Seule branche autorisée à créer un tag et une GitHub Release.**
+- `production` : état exact déployé en production. **Seule branche prévue pour publier un tag et une GitHub Release** ; cette exclusivité est une règle de processus appliquée par le workflow `Release`, et non une restriction technique globale de GitHub.
 - `master` : code stable validé, candidat à la mise en production.
 - `develop` : intégration des évolutions validées.
 - `feat/BP-123-description-courte` : nouvelle fonctionnalité.
@@ -144,6 +144,8 @@ Le workflow `.github/workflows/release.yml` :
 - refuse une version invalide ou un tag `vX.Y.Z` déjà existant ;
 - crée le tag `vX.Y.Z` et la GitHub Release avec notes générées.
 
+Ces contrôles ne portent que sur les opérations du workflow : ils garantissent qu'il ne publie ni une version mal formée ni un tag existant, mais ne peuvent pas empêcher un utilisateur autorisé de créer manuellement un tag.
+
 Prérequis avant publication :
 - les tickets affectés à la version sont terminés ou formellement reportés ;
 - les tests et contrôles de release passent ;
@@ -165,7 +167,7 @@ Ces réglages se configurent manuellement dans GitHub (Settings → Rules / Bran
 | `production` | PR obligatoire (depuis `master` ou `hotfix/*`), checks CI requis, revue approuvée, force push interdit, suppression interdite |
 | `master` | PR obligatoire (depuis `develop` ou `hotfix/*`), checks CI requis, revue approuvée, force push et suppression interdits |
 | `develop` | PR obligatoire (depuis `feat/*`, `fix/*`, `docs/*`), checks CI requis, force push et suppression interdits |
-| Tags `v*` | Protection des tags : création restreinte, mise à jour et suppression interdites |
+| Tags `v*` | Protection des tags : modification et suppression interdites ; création autorisée (manuelle ou via le workflow `Release`) |
 | Environnement `production` | Réviseurs requis avant publication, branches de déploiement limitées à `production` |
 
 Checks à rendre obligatoires (jobs du workflow `CI`) :
@@ -181,4 +183,4 @@ Réglages complémentaires : activer « Require a pull request before merging »
 Deux limites de GitHub sont à connaître :
 
 - les protections de branches ne permettent pas de restreindre nativement la **branche source** d'une Pull Request ; les règles « depuis `master` ou `hotfix/*` » reposent sur la convention, la revue et, si nécessaire, un check dédié ;
-- si la protection des tags `v*` restreint la création, autoriser le token GitHub Actions (ou prévoir un PAT dédié) pour que `gh release create` puisse créer le tag ; sinon la publication échouera.
+- la protection des tags `v*` couvre la modification et la suppression des tags existants, pas leur création : un utilisateur disposant des droits nécessaires peut toujours créer un tag manuellement, et le workflow `Release` peut créer le sien via `gh release create`.
