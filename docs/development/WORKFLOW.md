@@ -70,7 +70,7 @@ Chaque commit doit rester cohérent et ne pas mélanger plusieurs tickets indép
 1. Créer une branche dédiée à partir de `develop`.
 2. Confier au `developer` uniquement le ticket validé.
 3. Faire des commits atomiques en incluant la clé Jira.
-4. Ajouter les tests correspondant aux critères d'acceptation.
+4. Ajouter les tests correspondant aux critères d'acceptation (voir `docs/development/TESTING.md`).
 5. Ne jamais ajouter une règle de paie, un taux, un plafond ou une formule sans source, date d'effet et périmètre validés.
 
 ### Étape C — Pull Request

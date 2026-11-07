@@ -11,6 +11,8 @@ use Tests\TestCase;
 | can boot the application. RefreshDatabase is intentionally not applied
 | globally: tests opt in explicitly when they need a database.
 |
+| See docs/development/TESTING.md for the test conventions.
+|
 */
 
 pest()->extend(TestCase::class)->in('Feature');
