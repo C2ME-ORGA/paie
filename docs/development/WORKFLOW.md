@@ -5,9 +5,11 @@
 - **Jira** : périmètre fonctionnel, critères d'acceptation, dépendances, statut et version cible.
 - **GitHub** : code source, branches, commits, Pull Requests, revues et contrôles automatisés.
 - **OpenCode** : analyse, conception, implémentation et revue assistées par les agents du dépôt.
-- **Validation humaine** : arbitrages métier, conformité sociale, fusion et mise en production.
+- **Validation humaine** : arbitrages métier, conformité sociale, fusion et mise en production, assurés par le développeur unique.
 
-Un ticket Jira ne doit pas être considéré comme terminé uniquement parce que le code existe. Les critères d'acceptation et la revue doivent être satisfaits.
+L'organisation repose sur un **développeur unique**. Il réalise l'implémentation, assure la validation fonctionnelle et décide de la fusion. La revue technique est effectuée par l'assistant `reviewer` : elle ne nécessite pas de second développeur et ne constitue pas une approbation GitHub.
+
+Un ticket Jira ne doit pas être considéré comme terminé uniquement parce que le code existe. Les critères d'acceptation et la revue technique doivent être satisfaits.
 
 ## 2. Convention de branches
 
@@ -76,12 +78,12 @@ Chaque commit doit rester cohérent et ne pas mélanger plusieurs tickets indép
 2. Inclure la clé Jira dans le titre et le corps de la PR.
 3. Décrire les changements, les tests exécutés, les risques et les éventuelles migrations.
 4. Laisser la PR en brouillon tant que le travail ou les tests ne sont pas terminés.
-5. Demander une revue à `reviewer`.
+5. Demander une revue technique à l'assistant `reviewer`.
 6. Corriger les constats bloquants/majeurs et faire repasser les contrôles.
 
 ### Étape D — Validation et clôture
-1. Un humain vérifie les critères d'acceptation et les éventuelles décisions métier.
-2. Fusionner uniquement lorsque les contrôles sont verts et la revue acceptable ; la promotion vers `master` puis `production` fait l'objet de PR dédiées (§8).
+1. Le développeur unique vérifie les critères d'acceptation et les éventuelles décisions métier.
+2. Fusionner uniquement lorsque les contrôles sont verts et la revue technique traitée ; la décision de fusion appartient au développeur unique. La promotion vers `master` puis `production` fait l'objet de PR dédiées (§8).
 3. Mettre à jour le ticket Jira avec le résultat réel, les liens PR/commit et les éventuelles réserves.
 4. Passer le ticket à l'état correspondant au workflow Jira réel. Ne jamais supposer le nom ou l'identifiant d'une transition.
 5. Supprimer la branche après fusion si elle n'est plus utile.
@@ -106,7 +108,7 @@ Ne pas utiliser automatiquement `Closes BP-XXX` pour fermer le ticket lors de la
 - Aucun dump de base de données réelle ni donnée personnelle de salarié dans les fixtures, tests ou artefacts.
 - Les tests utilisent des données fictives.
 - Les logs et captures joints aux PR ne doivent pas exposer de données personnelles ou de paie.
-- Les migrations de données sensibles et les changements d'autorisations nécessitent une revue spécifique.
+- Les migrations de données sensibles et les changements d'autorisations nécessitent une revue spécifique de l'assistant `reviewer` et une validation du développeur unique.
 - Une revue de code ne remplace pas la validation de la règle sociale par une source officielle et une personne compétente.
 
 ## 7. Definition of Done
@@ -117,7 +119,8 @@ Un ticket est prêt à être clôturé lorsque :
 - les contrôles qualité disponibles passent ;
 - les permissions et données personnelles ont été examinées ;
 - les migrations et impacts de données sont documentés ;
-- la PR a été revue et fusionnée ;
+- la revue technique par l'assistant `reviewer` a été effectuée et ses constats bloquants traités ;
+- le développeur unique a validé fonctionnellement et décidé de la fusion ;
 - Jira contient le lien vers la PR et le compte rendu ;
 - les éventuelles réserves sont explicitement enregistrées.
 
@@ -151,7 +154,7 @@ Prérequis avant publication :
 - les tests et contrôles de release passent ;
 - les notes de version sont préparées et relues ;
 - les migrations et consignes de déploiement sont documentées ;
-- la validation humaine de mise en production est obtenue.
+- la validation de mise en production par le développeur unique est obtenue.
 
 Les versions Jira prévues sont `0.1.0`, `0.2.0`, `0.3.0` et `1.0.0`.
 La version cible `1.0.0` est attendue au 30 novembre 2026.
@@ -164,11 +167,13 @@ Ces réglages se configurent manuellement dans GitHub (Settings → Rules / Bran
 
 | Cible | Règles recommandées |
 |---|---|
-| `production` | PR obligatoire (depuis `master` ou `hotfix/*`), checks CI requis, revue approuvée, force push interdit, suppression interdite |
-| `master` | PR obligatoire (depuis `develop` ou `hotfix/*`), checks CI requis, revue approuvée, force push et suppression interdits |
+| `production` | PR obligatoire (depuis `master` ou `hotfix/*`), checks CI requis, force push interdit, suppression interdite |
+| `master` | PR obligatoire (depuis `develop` ou `hotfix/*`), checks CI requis, force push et suppression interdits |
 | `develop` | PR obligatoire (depuis `feat/*`, `fix/*`, `docs/*`), checks CI requis, force push et suppression interdits |
 | Tags `v*` | Protection des tags : modification et suppression interdites ; création autorisée (manuelle ou via le workflow `Release`) |
-| Environnement `production` | Réviseurs requis avant publication, branches de déploiement limitées à `production` |
+| Environnement `production` | Branches de déploiement limitées à `production` ; aucun réviseur obligatoire n'est configuré, la validation est assurée par le développeur unique |
+
+Les rulesets GitHub n'exigent aucune approbation par un second développeur : la revue technique est assurée par l'assistant `reviewer` et la validation fonctionnelle par le développeur unique, qui décide de la fusion.
 
 Checks à rendre obligatoires (jobs du workflow `CI`) :
 
@@ -182,5 +187,5 @@ Réglages complémentaires : activer « Require a pull request before merging »
 
 Deux limites de GitHub sont à connaître :
 
-- les protections de branches ne permettent pas de restreindre nativement la **branche source** d'une Pull Request ; les règles « depuis `master` ou `hotfix/*` » reposent sur la convention, la revue et, si nécessaire, un check dédié ;
+- les protections de branches ne permettent pas de restreindre nativement la **branche source** d'une Pull Request ; les règles « depuis `master` ou `hotfix/*` » reposent sur la convention et la revue technique, et, si nécessaire, sur un check dédié ;
 - la protection des tags `v*` couvre la modification et la suppression des tags existants, pas leur création : un utilisateur disposant des droits nécessaires peut toujours créer un tag manuellement, et le workflow `Release` peut créer le sien via `gh release create`.

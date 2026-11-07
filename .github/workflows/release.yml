@@ -43,9 +43,9 @@ jobs:
     permissions:
       contents: write
 
-    # Environnement de protection : réviseurs requis et branches de déploiement
-    # restreintes à `production` doivent être configurés manuellement dans GitHub
-    # (Settings → Environments). Voir docs/development/WORKFLOW.md §9.
+    # Environnement de protection : branches de déploiement restreintes à
+    # `production`. Aucun réviseur obligatoire n'est configuré : la validation
+    # est assurée par le développeur unique (voir docs/development/WORKFLOW.md §9).
     environment: production
 
     steps:
