@@ -42,7 +42,7 @@ Conséquences :
 - Fichier : `<Sujet>Test.php`, un sujet par fichier, dans la suite correspondante.
   - Exemples : `tests/Unit/UserInitialsTest.php`, `tests/Feature/HomePageTest.php`.
 - Ne pas conserver de fichiers `ExampleTest.php` : le nom doit décrire le sujet testé.
-- Description du test en anglais, à l'impératif, décrivant le comportement :
+- Description du test en anglais, formulée de manière affirmative et décrivant clairement le comportement attendu :
   `test('derives the user initials from the full name', ...)`.
 - Un scénario par test ; utiliser les datasets Pest pour les cas limites et les jeux de valeurs.
 - Écrire les tests avec les fonctions Pest (`test()`, `expect()`, `dataset()`), pas avec des classes PHPUnit, sauf besoin technique explicite.
