@@ -477,34 +477,48 @@ git checkout <tag ou commit validé>    # jamais une branche de travail
 composer install --no-dev --optimize-autoloader
 npm ci && npm run build                # Node.js 24 requis sur le serveur
 
-# 1. Migrations avec le compte de déploiement (détail : §4.4.2)
-php artisan config:clear
-export DB_USERNAME=batipaie_deploy
-read -r -s -p "Mot de passe de batipaie_deploy : " DB_PASSWORD
-echo
-export DB_PASSWORD
-php artisan migrate --force
-MIGRATION_STATUS=$?
-unset DB_USERNAME DB_PASSWORD
+# 1. Supprimer le cache de configuration avant de changer les identifiants
+if ! php artisan config:clear; then
+    echo "Échec de config:clear : arrêt du déploiement, maintenance conservée."
+else
+    # 2. Migrations avec le compte de déploiement (détail : §4.4.2)
+    export DB_USERNAME=batipaie_deploy
+    read -r -s -p "Mot de passe de batipaie_deploy : " DB_PASSWORD
+    echo
+    export DB_PASSWORD
 
-# 2. Reconstruction du cache de production avec le compte runtime, si la
-#    migration a réussi
-if [ "$MIGRATION_STATUS" -eq 0 ]; then
-    php artisan optimize               # config, routes, vues
+    if php artisan migrate --force; then
+        # Supprimer immédiatement les identifiants temporaires : les commandes
+        # suivantes doivent utiliser le compte runtime défini dans le .env.
+        unset DB_USERNAME DB_PASSWORD
+
+        # 3. Ne sortir de maintenance que si chaque vérification et optimisation
+        #    réussit. En cas d'échec, l'application reste en maintenance.
+        if php artisan migrate:status &&
+           php artisan optimize &&
+           php artisan filament:optimize &&
+           php artisan queue:restart; then
+            php artisan up
+        else
+            echo "Échec d'une vérification ou optimisation : maintenance conservée."
+        fi
+    else
+        MIGRATION_STATUS=$?
+        unset DB_USERNAME DB_PASSWORD
+        echo "Échec de la migration (code $MIGRATION_STATUS) : maintenance conservée."
+    fi
 fi
-php artisan migrate:status             # vérification (lecture seule)
-php artisan filament:optimize
-php artisan queue:restart              # si workers actifs
-php artisan up
 ```
 
 - Exécuter ces commandes sous l'identité de l'utilisateur du site (voir §4.8) ou
   rétablir ensuite `sudo chown -R www:www storage bootstrap/cache`, afin que
   PHP-FPM conserve l'accès en écriture.
 - Toujours sauvegarder la base avant une migration.
-- En cas d'erreur : `php artisan optimize:clear` pour diagnostiquer.
+- En cas d'erreur : diagnostiquer sans exécuter `php artisan up` tant que la cause
+  n'est pas corrigée et les contrôles relancés.
 - Ne jamais modifier `.env` pendant que `config:cache` est actif sans rejouer
   `php artisan optimize` ensuite.
+- `php artisan queue:restart` est à conserver si des workers sont actifs.
 - Aucun déploiement automatique n'est configuré : cette procédure est exécutée
   manuellement par l'administrateur.
 
