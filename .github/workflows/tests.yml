@@ -1,19 +1,22 @@
 name: CI
 
 # Stratégie de branches (docs/development/WORKFLOW.md) :
-# - les évolutions partent de `develop` et la ciblent par Pull Request ;
-# - les versions validées sont promues de `develop` vers `main`.
-# Les branches de travail (feature/*, fix/*, ...) sont donc contrôlées via leur PR.
+# - feat/* et fix/* partent de `develop` et la ciblent par Pull Request ;
+# - `develop` est promue vers `master`, puis `master` vers `production` ;
+# - seule `production` peut publier un tag et une GitHub Release (workflow Release).
+# Les branches de travail sont donc contrôlées via leur PR.
 
 on:
   push:
     branches:
       - develop
-      - main
+      - master
+      - production
   pull_request:
     branches:
       - develop
-      - main
+      - master
+      - production
   workflow_dispatch:
 
 permissions:

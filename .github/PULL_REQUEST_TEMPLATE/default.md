@@ -1,6 +1,7 @@
 ## Ticket Jira
 
 Référence : BP-
+Branche cible : `develop` / `master` / `production`
 
 ## Objectif
 
