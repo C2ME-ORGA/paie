@@ -2,11 +2,14 @@
 
 namespace App\Actions\Administration;
 
+use App\Enums\AuditEventType;
 use App\Enums\PermissionName;
 use App\Enums\RbacRole;
 use App\Exceptions\AdministratorInvitationException;
 use App\Models\AdministratorInvitation;
 use App\Models\User;
+use App\Services\Audit\AuditContext;
+use App\Services\Audit\AuditManager;
 use App\Support\Rbac\RbacSynchronizer;
 use App\Support\Security\AdministratorPassword;
 use Illuminate\Database\UniqueConstraintViolationException;
@@ -17,6 +20,10 @@ use Spatie\Permission\Models\Role;
 
 final class AcceptAdministratorInvitation
 {
+    public function __construct(
+        private readonly AuditManager $audit,
+    ) {}
+
     public function handle(string $token, string $password): User
     {
         Validator::make(
@@ -75,6 +82,40 @@ final class AcceptAdministratorInvitation
                 $user->assignRole($administratorRole);
 
                 $invitation->forceFill(['consumed_at' => now()])->save();
+
+                $context = AuditContext::system(
+                    correlationId: (string) Str::uuid(),
+                    reason: 'Acceptation d’une invitation administrateur',
+                    metadata: [
+                        'source' => 'http',
+                        'channel' => 'administrator_invitation',
+                        'initiated_by' => 'invitation_recipient',
+                    ],
+                );
+
+                $this->audit->record(
+                    event: AuditEventType::UserCreated,
+                    subject: $user,
+                    newValues: $user->only(['name', 'email', 'email_verified_at']),
+                    context: $context,
+                );
+
+                $this->audit->record(
+                    event: AuditEventType::RbacRoleAssigned,
+                    subject: $user,
+                    context: $context->withMetadata([
+                        'role' => $administratorRole->name,
+                        'guard' => RbacSynchronizer::GUARD,
+                    ]),
+                );
+
+                $this->audit->record(
+                    event: AuditEventType::AdministratorInvitationConsumed,
+                    subject: $invitation,
+                    oldValues: ['consumed_at' => null],
+                    newValues: ['consumed_at' => $invitation->consumed_at],
+                    context: $context,
+                );
 
                 return $user;
             });
