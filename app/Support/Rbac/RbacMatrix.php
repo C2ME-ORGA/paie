@@ -20,6 +20,7 @@ final class RbacMatrix
     private const MATRIX = [
         RbacRole::Administrator->value => [
             PermissionName::AdministrationPanelAccess,
+            PermissionName::AuditView,
         ],
         RbacRole::Management->value => [
             PermissionName::AdministrationPanelAccess,
