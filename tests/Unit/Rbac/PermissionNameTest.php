@@ -8,7 +8,10 @@ test('defines unique, namespaced permission names', function () {
         PermissionName::cases(),
     );
 
-    expect($names)->toBe(['administration.panel.access'])
+    expect($names)->toBe([
+        'administration.panel.access',
+        'audit.view',
+    ])
         ->and(array_unique($names))->toHaveCount(count($names));
 });
 

@@ -12,4 +12,5 @@ namespace App\Enums;
 enum PermissionName: string
 {
     case AdministrationPanelAccess = 'administration.panel.access';
+    case AuditView = 'audit.view';
 }

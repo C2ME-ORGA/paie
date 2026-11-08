@@ -18,11 +18,14 @@ beforeEach(function () {
     app(RbacSynchronizer::class)->synchronize();
 });
 
-test('creates the seven roles and only the active platform permission', function () {
+test('creates the seven roles and the active platform and audit permissions', function () {
     expect(Role::query()->where('guard_name', 'web')->count())->toBe(7)
-        ->and(Permission::query()->where('guard_name', 'web')->count())->toBe(1)
+        ->and(Permission::query()->where('guard_name', 'web')->count())->toBe(2)
         ->and(Permission::query()->pluck('name')->all())
-        ->toBe([PermissionName::AdministrationPanelAccess->value])
+        ->toBe([
+            PermissionName::AdministrationPanelAccess->value,
+            PermissionName::AuditView->value,
+        ])
         ->and(Permission::query()
             ->where('name', PermissionName::AdministrationPanelAccess->value)
             ->where('guard_name', 'web')
@@ -30,7 +33,8 @@ test('creates the seven roles and only the active platform permission', function
 
     $administrator = Role::findByName(RbacRole::Administrator->value, 'web');
 
-    expect($administrator->hasPermissionTo(PermissionName::AdministrationPanelAccess->value))->toBeTrue();
+    expect($administrator->hasPermissionTo(PermissionName::AdministrationPanelAccess->value))->toBeTrue()
+        ->and($administrator->hasPermissionTo(PermissionName::AuditView->value))->toBeTrue();
 });
 
 test('grants the panel permission only to internal back-office roles', function () {
@@ -61,8 +65,8 @@ test('can be run repeatedly without creating duplicates', function () {
     app(RbacSynchronizer::class)->synchronize();
 
     expect(Role::query()->count())->toBe(7)
-        ->and(Permission::query()->count())->toBe(1)
-        ->and(DB::table('role_has_permissions')->count())->toBe(5);
+        ->and(Permission::query()->count())->toBe(2)
+        ->and(DB::table('role_has_permissions')->count())->toBe(6);
 });
 
 test('removes an extra permission from a managed role during synchronization', function () {
@@ -77,7 +81,10 @@ test('removes an extra permission from a managed role during synchronization', f
     app(RbacSynchronizer::class)->synchronize();
 
     expect($administrator->fresh()->permissions()->pluck('name')->all())
-        ->toBe([PermissionName::AdministrationPanelAccess->value]);
+        ->toBe([
+            PermissionName::AdministrationPanelAccess->value,
+            PermissionName::AuditView->value,
+        ]);
 });
 
 test('preserves roles and permissions that are not managed by the matrix', function () {
@@ -111,7 +118,7 @@ test('the RBAC seeder is idempotent and does not create a user', function () {
     $this->seed(RbacSeeder::class);
 
     expect(Role::query()->count())->toBe(7)
-        ->and(Permission::query()->count())->toBe(1)
+        ->and(Permission::query()->count())->toBe(2)
         ->and(User::query()->count())->toBe(0);
 });
 
@@ -119,6 +126,6 @@ test('the database seeder seeds RBAC without creating an administrator', functio
     $this->seed(DatabaseSeeder::class);
 
     expect(Role::query()->count())->toBe(7)
-        ->and(Permission::query()->count())->toBe(1)
+        ->and(Permission::query()->count())->toBe(2)
         ->and(User::query()->count())->toBe(0);
 });

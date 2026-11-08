@@ -31,11 +31,12 @@ L'initialisation du premier administrateur est décrite dans
 Les codes machine sont persistés dans Spatie et doivent rester stables. Les libellés sont
 en français et peuvent évoluer sans casser le code.
 
-Au Lot 1A, la seule permission active est `administration.panel.access`. Elle est accordée
-aux rôles internes qui utiliseront le back-office. Le rôle Salarié n'y accède pas. Le rôle
+Au Lot 1D, les permissions actives sont `administration.panel.access` et `audit.view`.
+La première est accordée aux rôles internes qui utilisent le back-office. La seconde est
+accordée uniquement au rôle Administrateur. Le rôle Salarié n'y accède pas. Le rôle
 Expert-comptable externe reste sans permission tant qu'un accès en lecture seule, limité à
-des données et à une période explicites, n'est pas implémenté. Les permissions métier seront
-ajoutées avec leurs modules et leurs policies.
+des données et à une période explicites, n'est pas implémenté. Les autres permissions métier
+seront ajoutées avec leurs modules et leurs policies.
 
 ## 3. Convention de nommage des permissions
 
@@ -48,17 +49,19 @@ Format : `module[.resource].action`.
   `update`, `delete`, etc.), car le `Gate::before` de Spatie accorde une ability du même nom
   à un utilisateur qui possède la permission correspondante.
 
-Permission active au Lot 1A :
+Permissions actives au Lot 1D :
 
 ```text
 administration.panel.access
+audit.view
 ```
 
-## 4. Matrice active du Lot 1A
+## 4. Matrice active du Lot 1D
 
 | Permission | Administrator | Management | Payroll manager | HR manager | Employee | Site manager | External accountant |
 |---|---:|---:|---:|---:|---:|---:|---:|
 | `administration.panel.access` | ✅ | ✅ | ✅ | ✅ | — | ✅ | — |
+| `audit.view` | ✅ | — | — | — | — | — | — |
 
 Cette matrice est la source de vérité dans `app/Support/Rbac/RbacMatrix.php`.
 Toute permission accordée à un rôle géré en dehors de cette matrice est retirée lors de la
@@ -74,7 +77,6 @@ correspondante n'existe pas :
   `users.assign_roles` ;
 - administration des rôles : `roles.manage` ;
 - consultation des permissions : `permissions.view` ;
-- audit : `audit.view` ;
 - réglages : `settings.manage` ;
 - paie : `payroll.view`, `payroll.prepare`, `payroll.validate`, `payroll.close`,
   `payroll.exports.download`, `payroll.variables.view`, `payroll.variables.manage` ;
@@ -155,8 +157,11 @@ Ne jamais modifier les rôles ou permissions directement en base pour contourner
 vérifie la permission `administration.panel.access` sur le guard `web`. L'accès ne dépend
 pas du nom du rôle.
 
-Le panel active `strictAuthorization()`. Aucune ressource Filament métier n'existe au Lot 1A,
-donc aucune policy métier n'est nécessaire. Lors de l'ajout d'une ressource :
+Le panel active `strictAuthorization()`. Au Lot 1D, une seule ressource Filament est
+enregistrée : `ActivityLogResource`, en lecture seule. Elle est protégée par la policy
+`Activity` fournie par le plugin et mappée vers `audit.view`.
+
+Lors de l'ajout d'une ressource :
 
 - créer la policy Laravel avant d'exposer la ressource ;
 - couvrir `viewAny`, `view`, `create`, `update`, `delete` et les actions utilisées ;
@@ -183,7 +188,7 @@ role_or_permission
 Ils correspondent aux middlewares `Spatie\Permission\Middleware\*`. Le package 8.5 ne les
 enregistre pas lui-même.
 
-## 12. Points d'entrée et contrôles serveur — Lot 1C
+## 12. Points d'entrée et contrôles serveur — Lot 1D
 
 ### Tableau des points d'entrée
 
@@ -192,6 +197,8 @@ enregistre pas lui-même.
 | `GET /` | Publique | Page d'accueil statique, aucune donnée métier. |
 | `GET /admin/login` | Publique | Formulaire Filament, CSRF et limitation de débit Filament. |
 | `GET /admin` | Authentifiée | Session `web` + permission `administration.panel.access`. |
+| `GET /admin/activity-logs` | Authentifiée | Session `web` + `audit.view` ; ressource Filament en lecture seule. |
+| `GET /admin/activity-logs/{record}` | Authentifiée | Session `web` + `audit.view` ; policy `view` de la ressource. |
 | `POST /admin/logout` | Authentifiée | Session `web`, CSRF, déconnexion Filament. |
 | `GET /admin/invitation/{token}` | Publique avec jeton | Format `[a-f0-9]{64}`, hash, expiration, limitation de débit, en-têtes de sécurité. |
 | `POST /admin/invitation/{token}` | Publique avec jeton | Mêmes contrôles, CSRF, validation du mot de passe, consommation atomique. |
@@ -199,8 +206,8 @@ enregistre pas lui-même.
 | `GET /up` | Publique | Health check Laravel, aucune donnée sensible. |
 | `GET /sanctum/csrf-cookie` | Publique | Cookie CSRF standard Sanctum. |
 | `GET/PUT /storage/{path}` | Signée | Disque privé, signature requise ; hors RBAC. |
-| Endpoints Livewire | Publiques avec contrôles techniques | Aucun composant applicatif ; chaque futur composant devra autoriser ses actions. |
-| Téléchargements Filament export/import | Authentifiés/signés | Aucun export métier actif ; policy ou propriétaire selon Filament. |
+| Endpoints Livewire | Publiques avec contrôles techniques | Les pages `ActivityLogResource` sont protégées par la policy de ressource ; aucun autre composant applicatif. |
+| Téléchargements Filament export/import | Authentifiés/signés | Aucun export d'audit actif ; action désactivée dans la configuration. |
 
 ### Panel Filament
 
@@ -209,8 +216,9 @@ enregistre pas lui-même.
 - Le Dashboard, `AccountWidget` et `FilamentInfoWidget` héritent de la protection du panel.
 - Le Dashboard ne contient aucune donnée métier et ne nécessite pas de policy supplémentaire.
 - `AccountWidget` vérifie l'authentification ; `FilamentInfoWidget` n'expose que des informations techniques.
-- Aucune ressource, page personnalisée ou action Filament métier n'existe.
-- Aucune policy artificielle n'a été créée.
+- `ActivityLogResource` existe en lecture seule, protégée par `audit.view`.
+- Les widgets, le dashboard, la page d'activités utilisateur, les mutations, l'export et le retention hold du plugin sont désactivés.
+- Aucune policy applicative parallèle n'a été créée ; la policy `Activity` du plugin est utilisée.
 
 ### Routes web
 
@@ -240,8 +248,9 @@ enregistre pas lui-même.
 
 - Aucune ressource métier (salariés, contrats, paie, temps, absences, chantiers) n'existe.
 - Aucun contrôle de portée de données n'est encore applicable.
+- La consultation du journal d'audit est la seule ressource Filament métier active.
 - Aucune interface de gestion des utilisateurs, rôles ou permissions.
-- Aucune policy métier ni permission métier active.
+- Aucune policy métier supplémentaire ni permission métier hors audit.
 - L'API ne fournit pas encore de gestion de tokens Sanctum.
 - Les endpoints Livewire et de stockage sont des surfaces techniques ; leur autorisation métier sera à traiter avec les composants concernés.
 
@@ -272,6 +281,7 @@ Les tests RBAC couvrent :
 - les alias middleware, `strictAuthorization()` et l'absence de wildcard ;
 - les pages publiques et les URL directes du panel ;
 - l'API `/api/user` en 401, 200, auto-accès et absence d'attributs sensibles ;
+- l'accès direct et Livewire à `ActivityLogResource` avec et sans `audit.view` ;
 - l'absence de route HTTP pour la commande de bootstrap administrateur.
 
 Référence : `docs/development/TESTING.md` pour les conventions de tests et

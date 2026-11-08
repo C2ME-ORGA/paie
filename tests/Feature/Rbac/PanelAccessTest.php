@@ -123,8 +123,11 @@ test('the administrator receives no implicit business permission', function () {
     $administrator->assignRole(RbacRole::Administrator->value);
 
     expect($administrator->can('payroll.view'))->toBeFalse()
-        ->and($administrator->getAllPermissions()->pluck('name')->all())
-        ->toBe([PermissionName::AdministrationPanelAccess->value]);
+        ->and($administrator->getAllPermissions()->pluck('name')->sort()->values()->all())
+        ->toBe([
+            PermissionName::AdministrationPanelAccess->value,
+            PermissionName::AuditView->value,
+        ]);
 });
 
 test('the user model implements the Filament contract', function () {

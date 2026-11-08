@@ -73,6 +73,21 @@ return [
             'replace_placeholders' => true,
         ],
 
+        /*
+         * Dedicated best-effort channel for audit journal write failures.
+         *
+         * It is file based on purpose: it must remain available when the audit
+         * database (activity_log) is unreachable. Only critical signals are
+         * accepted, and AuditFallbackLogger never forwards audited values.
+         */
+        'audit_fallback' => [
+            'driver' => 'daily',
+            'path' => storage_path('logs/audit-fallback.log'),
+            'level' => 'critical',
+            'max_files' => 30,
+            'replace_placeholders' => true,
+        ],
+
         'monthly' => [
             'driver' => 'monthly',
             'path' => storage_path('logs/laravel.log'),

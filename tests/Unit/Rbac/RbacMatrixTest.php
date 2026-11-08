@@ -15,16 +15,21 @@ test('covers every role and only references canonical permissions', function () 
     }
 });
 
-test('grants only the panel permission to the internal back-office roles', function () {
-    $rolesWithPanelAccess = [
-        RbacRole::Administrator,
+test('grants panel access to internal roles and audit view to the administrator', function () {
+    expect(RbacMatrix::permissionsFor(RbacRole::Administrator))
+        ->toBe([
+            PermissionName::AdministrationPanelAccess,
+            PermissionName::AuditView,
+        ]);
+
+    $rolesWithPanelAccessOnly = [
         RbacRole::Management,
         RbacRole::PayrollManager,
         RbacRole::HrManager,
         RbacRole::SiteManager,
     ];
 
-    foreach ($rolesWithPanelAccess as $role) {
+    foreach ($rolesWithPanelAccessOnly as $role) {
         expect(RbacMatrix::permissionsFor($role))
             ->toBe([PermissionName::AdministrationPanelAccess]);
     }

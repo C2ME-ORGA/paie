@@ -324,6 +324,17 @@ obligatoires :
 - `LOG_LEVEL=warning` (ou `error`) ;
 - `MAIL_MAILER=smtp` avec les paramètres du fournisseur.
 
+**Clé d'intégrité du journal d'audit.** `ACTIVITY_LOG_INTEGRITY_KEY` est obligatoire dans
+tout environnement autre que `local` et `testing` : au moins 32 caractères, stable,
+différente de `APP_KEY`. Le repli sur `APP_KEY` est refusé partout ailleurs. La valeur est
+résolue au moment de `config:cache` : après toute modification de `.env`, exécuter
+`php artisan config:clear` puis `php artisan optimize`. Une clé absente interrompt le
+démarrage (fail-closed).
+
+**Canal de secours.** Si le journal d'audit est indisponible, un signal `critical` est écrit
+dans `storage/logs/audit-fallback.log` (canal `audit_fallback`, configurable via
+`AUDIT_FALLBACK_LOG_CHANNEL`). Ce fichier doit être supervisé.
+
 Le fichier `.env` de production est créé sur le serveur et n'est jamais versionné.
 
 **Permissions et édition.** Le fichier appartient à l'utilisateur PHP-FPM avec des

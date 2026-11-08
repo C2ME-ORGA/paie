@@ -1,5 +1,6 @@
 <?php
 
+use AlizHarb\ActivityLog\Resources\ActivityLogs\ActivityLogResource;
 use Filament\Facades\Filament;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Gate;
@@ -22,7 +23,7 @@ test('enables strict authorization on the web-guarded admin panel', function () 
 
     expect($panel->isAuthorizationStrict())->toBeTrue()
         ->and($panel->getAuthGuard())->toBe('web')
-        ->and($panel->getResources())->toBe([]);
+        ->and($panel->getResources())->toBe([ActivityLogResource::class]);
 
     foreach ($panel->getResources() as $resource) {
         expect(Gate::getPolicyFor($resource::getModel()))->not->toBeNull();
