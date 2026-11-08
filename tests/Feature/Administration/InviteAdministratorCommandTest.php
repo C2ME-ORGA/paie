@@ -73,7 +73,12 @@ test('creates an invitation and sends the notification without creating a user',
 
     expect($token)->not->toBe('')
         ->and($invitation->token_hash)->toBe(AdministratorInvitation::hashToken($token))
+        ->and($sent->acceptanceUrl)->toBe(route('administrator-invitations.show', ['token' => $token]))
         ->and($output)->not->toContain($token);
+
+    $this->get(route('administrator-invitations.show', ['token' => $token]))
+        ->assertOk()
+        ->assertSee('Créer le compte administrateur');
 
     $mail = $sent->toMail(new AnonymousNotifiable);
 

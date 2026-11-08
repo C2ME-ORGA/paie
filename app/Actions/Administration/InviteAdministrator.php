@@ -100,7 +100,7 @@ final class InviteAdministrator
             Notification::route('mail', $invitation->email)
                 ->notify(new AdministratorInvitationNotification(
                     $invitation,
-                    route('administrator-invitations.accept', ['token' => $token]),
+                    route('administrator-invitations.show', ['token' => $token]),
                 ));
         } catch (Throwable) {
             // Never log the token or the e-mail body. Revoke the invitation so

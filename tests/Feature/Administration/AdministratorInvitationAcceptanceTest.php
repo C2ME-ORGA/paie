@@ -46,10 +46,22 @@ test('shows the acceptance form without consuming the invitation', function () {
     $response->assertOk()
         ->assertSee('Créer le compte administrateur')
         ->assertSee('name="_token"', false)
+        ->assertSee('method="POST"', false)
+        ->assertSee(route('administrator-invitations.accept', ['token' => $token], false), false)
         ->assertHeader('Referrer-Policy', 'no-referrer')
         ->assertHeader('X-Robots-Tag', 'noindex, nofollow');
 
     expect($invitation->fresh()->consumed_at)->toBeNull();
+});
+
+test('registers distinct GET and POST routes for the invitation flow', function () {
+    $show = app('router')->getRoutes()->getByName('administrator-invitations.show');
+    $accept = app('router')->getRoutes()->getByName('administrator-invitations.accept');
+
+    expect($show)->not->toBeNull()
+        ->and($show?->methods())->toContain('GET')
+        ->and($accept)->not->toBeNull()
+        ->and($accept?->methods())->toContain('POST');
 });
 
 test('returns a generic not found page for invalid, expired, consumed or revoked invitations', function () {
