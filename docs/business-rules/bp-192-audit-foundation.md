@@ -217,7 +217,7 @@ Conséquence : une future policy BatiPaie sur `Activity` serait écrasée par le
 
 ## 6. Intégrité et limites connues
 
-Le plugin signe les nouvelles lignes avec un HMAC-SHA256 dans `integrity_hash`. La clé provient de `ACTIVITY_LOG_INTEGRITY_KEY`. Le repli sur `APP_KEY` n'est autorisé qu'en local/test ; en production, une clé dédiée, stable et différente de `APP_KEY` est obligatoire (contrôle du Lot 1E).
+Le plugin signe les nouvelles lignes avec un HMAC-SHA256 dans `integrity_hash`. La clé provient de `ACTIVITY_LOG_INTEGRITY_KEY`. Le repli sur `APP_KEY` n'est autorisé qu'en `local` et `testing` ; dans tout autre environnement (`staging`, `preproduction`, `production`, nom personnalisé), une clé dédiée, stable, d'au moins 32 caractères et différente de `APP_KEY` est obligatoire (contrôle du Lot 1E, durci par le lot correctif final).
 
 ### 6.1 Ce qui est vérifié
 

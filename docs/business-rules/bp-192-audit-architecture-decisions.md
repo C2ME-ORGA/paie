@@ -303,23 +303,23 @@ Proposition technique de paramétrage (les valeurs absolues ne sont pas fixées 
 3. **Pas d'identification de clé** : aucune colonne `key_id`.
 4. **Rotation non gérée** : changer la clé rend toutes les anciennes signatures invérifiables. `docs/business-rules/bp-192-audit-consolidation.md` §5.3 le documente déjà.
 5. **Re-signature possible** : `filament-activity-log:backfill` (`.../Commands/BackfillAuditMetadataCommand.php`) recalcule et réécrit `integrity_hash` pour des lignes existantes. **Déduction** : un opérateur disposant de la clé et de la console peut modifier une ligne puis la re-signer. Le HMAC protège contre une altération SQL sans accès applicatif, pas contre un administrateur système.
-6. **Fallback `APP_KEY`** : autorisé hors production. `AuditIntegrityConfiguration::assertConfigured()` ne s'exécute que si `app()->isProduction()`. **Déduction** : un environnement `staging` ou `preprod` n'est pas protégé par cette garde et peut signer avec `APP_KEY`.
+6. **Fallback `APP_KEY`** : limité à `local` et `testing` depuis le lot correctif final. Tout autre environnement (`staging`, `preproduction`, `production`, nom personnalisé) exige une clé dédiée, d'au moins 32 caractères et différente de `APP_KEY`.
 7. **Sauvegardes** : elles contiennent les lignes signées ; un `DELETE` en base reste indétectable si la sauvegarde n'est pas comparée.
 
 ### 5.6 Séparation clé HMAC / `APP_KEY`
 
-**Fait** : `app/Support/Audit/AuditIntegrityConfiguration.php::assertConfigured()` impose, en production :
+**Fait** : `app/Support/Audit/AuditIntegrityConfiguration.php::assertConfigured()` impose, hors `local` et `testing` :
 
 - intégrité activée ;
 - clé non vide ;
 - longueur ≥ 32 caractères ;
 - clé différente de `APP_KEY` (`hash_equals`).
 
-**Fait** : hors production, la méthode retourne immédiatement. Le fallback du package s'applique.
+**Fait** : en `local` et `testing`, la méthode retourne immédiatement. Le fallback du package s'applique.
 
-**Déduction** : la séparation est garantie en production uniquement. Aucun contrôle équivalent n'existe pour `staging`.
+**Déduction (corrigée par le lot correctif final)** : la séparation est désormais garantie dans tout environnement autre que `local` et `testing`, y compris `staging` et `preproduction`.
 
-**Recommandation** : étendre la garde aux environnements non locaux et non `testing` (par exemple refuser le fallback dès que `APP_ENV` n'est pas `local` ou `testing`), sans modifier le mécanisme HMAC lui-même.
+**Recommandation (mise en œuvre)** : la garde repose sur une liste positive (`local`, `testing`) ; tout autre environnement exige une clé dédiée, sans possibilité de désactivation par variable d'environnement.
 
 ### 5.7 Approches d'intégrité comparées
 
@@ -698,7 +698,7 @@ Analyse par événement :
 | 2 | Absence de chaînage HMAC | Fait | suppression indétectable | vérification planifiée + ancrage externe |
 | 3 | Re-signature via `filament-activity-log:backfill` | Fait | un administrateur peut blanchir une modification | restreindre l'accès console, tracer son exécution |
 | 4 | Rotations de clé non gérées | Fait | historique invérifiable | procédure de rotation + conservation de l'ancienne clé |
-| 5 | Garde de production uniquement | Fait | `staging` peut utiliser `APP_KEY` | étendre la garde aux environnements non locaux |
+| 5 | Garde limitée à `production` | **Corrigé** | repli `APP_KEY` limité à `local` et `testing` ; tout autre environnement exige une clé dédiée | corrigé par le lot correctif final |
 | 6 | Buffer Activitylog activable | Fait | lignes non signées | test de configuration bloquant |
 | 7 | Événements Spatie Permission activables | Fait | doublons et bruit | test bloquant + documentation |
 | 8 | Observateurs ajoutés ultérieurement | Risque | doublons | règle « instrumentation explicite uniquement » |

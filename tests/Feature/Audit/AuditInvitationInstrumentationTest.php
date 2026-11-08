@@ -1,5 +1,6 @@
 <?php
 
+use App\Contracts\AuditLogger;
 use App\Enums\AuditEventType;
 use App\Models\AdministratorInvitation;
 use App\Models\User;
@@ -7,8 +8,10 @@ use App\Support\Rbac\RbacSynchronizer;
 use Illuminate\Contracts\Notifications\Dispatcher;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Artisan;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Notification;
 use Spatie\Activitylog\Models\Activity;
+use Tests\Support\Audit\ThrowingAuditLogger;
 
 uses(RefreshDatabase::class);
 
@@ -262,4 +265,47 @@ test('records the revocation caused by a mail delivery failure with the same cor
         ->and($revoked->properties->get('correlation_id'))
         ->toBe($created->properties->get('correlation_id'))
         ->and(json_encode($revoked->getAttributes()))->not->toContain($invitation->token_hash);
+});
+
+test('keeps the invitation revoked when the delivery failure audit cannot be written', function () {
+    $logger = new ThrowingAuditLogger([AuditEventType::AdministratorInvitationDeliveryFailed]);
+    app()->forgetScopedInstances();
+    app()->instance(AuditLogger::class, $logger);
+
+    Log::shouldReceive('channel')->once()->with('audit_fallback')->andReturnSelf();
+    Log::shouldReceive('critical')->once();
+    Log::shouldReceive('error')->zeroOrMoreTimes();
+
+    $this->app->instance(Dispatcher::class, new class implements Dispatcher
+    {
+        public function send($notifiables, $notification): void
+        {
+            throw new RuntimeException('SMTP transport failure');
+        }
+
+        /**
+         * @param  array<int, string>|null  $channels
+         */
+        public function sendNow($notifiables, $notification, ?array $channels = null): void
+        {
+            throw new RuntimeException('SMTP transport failure');
+        }
+    });
+
+    $exitCode = Artisan::call('batipaie:admin-invite', [
+        '--name' => 'Alice Admin',
+        '--email' => 'admin@example.com',
+    ]);
+
+    $invitation = AdministratorInvitation::query()->sole();
+
+    expect($exitCode)->toBe(1)
+        ->and($invitation->revoked_at)->not->toBeNull()
+        ->and($logger->recorded)->toBe([
+            AuditEventType::AdministratorInvitationCreated->value,
+            AuditEventType::AdministratorInvitationDeliveryFailed->value,
+        ])
+        ->and(Activity::query()
+            ->where('event', AuditEventType::AdministratorInvitationDeliveryFailed->value)
+            ->count())->toBe(0);
 });

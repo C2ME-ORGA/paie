@@ -6,11 +6,13 @@ use App\Enums\AuditEventType;
 use App\Enums\PermissionName;
 use App\Enums\RbacRole;
 use App\Exceptions\AdministratorInvitationException;
+use App\Exceptions\AuditLoggingException;
 use App\Models\AdministratorInvitation;
 use App\Models\User;
 use App\Notifications\AdministratorInvitationNotification;
 use App\Services\Audit\AuditContext;
 use App\Services\Audit\AuditManager;
+use App\Support\Audit\AuditFallbackLogger;
 use App\Support\Rbac\RbacSynchronizer;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Support\Facades\DB;
@@ -142,22 +144,35 @@ final class InviteAdministrator
 
             $context = $this->systemContext('Échec d’envoi de l’invitation administrateur', $correlationId);
 
-            $this->audit->record(
-                event: AuditEventType::AdministratorInvitationDeliveryFailed,
-                subject: $invitation,
-                context: $context,
-            );
+            try {
+                $this->audit->record(
+                    event: AuditEventType::AdministratorInvitationDeliveryFailed,
+                    subject: $invitation,
+                    context: $context,
+                );
 
-            $this->audit->record(
-                event: AuditEventType::AdministratorInvitationRevoked,
-                subject: $invitation,
-                oldValues: ['revoked_at' => $oldRevokedAt],
-                newValues: ['revoked_at' => $invitation->revoked_at],
-                context: $this->systemContext(
-                    'Révocation après échec d’envoi de l’invitation administrateur',
+                $this->audit->record(
+                    event: AuditEventType::AdministratorInvitationRevoked,
+                    subject: $invitation,
+                    oldValues: ['revoked_at' => $oldRevokedAt],
+                    newValues: ['revoked_at' => $invitation->revoked_at],
+                    context: $this->systemContext(
+                        'Révocation après échec d’envoi de l’invitation administrateur',
+                        $correlationId,
+                    ),
+                );
+            } catch (AuditLoggingException $exception) {
+                // The invitation stays revoked even when the audit journal is
+                // unavailable. The partial state is reported to the fallback
+                // channel and the original failure is preserved.
+                AuditFallbackLogger::report(
+                    AuditEventType::AdministratorInvitationDeliveryFailed,
                     $correlationId,
-                ),
-            );
+                    $exception,
+                );
+
+                throw $exception;
+            }
 
             throw AdministratorInvitationException::emailDeliveryFailed();
         }

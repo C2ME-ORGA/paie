@@ -10,6 +10,17 @@ return [
 
     /*
     |--------------------------------------------------------------------------
+    | Fallback channel
+    |--------------------------------------------------------------------------
+    |
+    | Monolog channel used when the audit journal cannot be written. It must be
+    | independent from the audit database and is limited to critical signals.
+    |
+    */
+    'fallback_channel' => env('AUDIT_FALLBACK_LOG_CHANNEL', 'audit_fallback'),
+
+    /*
+    |--------------------------------------------------------------------------
     | Allowed attribute fields
     |--------------------------------------------------------------------------
     |
