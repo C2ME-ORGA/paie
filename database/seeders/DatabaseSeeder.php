@@ -9,11 +9,11 @@ class DatabaseSeeder extends Seeder
     /**
      * Seed the application's database.
      *
-     * Intentionally left empty: no default user, administrator or credential
-     * is created. Business seeders will be added once their rules are validated.
+     * Only the technical RBAC referential is seeded. No default user,
+     * administrator, password or business data is created.
      */
     public function run(): void
     {
-        //
+        $this->call(RbacSeeder::class);
     }
 }

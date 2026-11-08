@@ -75,7 +75,9 @@ Règles :
 - activer `RefreshDatabase` **dans le test concerné** (ou un `pest()->use(...)` local à un sous-dossier), jamais globalement ;
 - créer les données via les factories (`database/factories`) et des états explicites ;
 - tester les permissions en positif et en négatif pour tout écran ou endpoint sensible ;
-- pour les composants Livewire/Filament, tester le comportement visible et les autorisations, pas le rendu interne.
+- pour les composants Livewire/Filament, tester le comportement visible et les autorisations, pas le rendu interne ;
+- les tests RBAC (rôles, permissions, accès panel) suivent [`docs/security/RBAC.md`](../security/RBAC.md) et couvrent le positif, le négatif et l'absence de bypass ;
+- les tests du bootstrap administrateur couvrent la commande, l'invitation, l'acceptation, la notification et la limitation de débit (voir [`docs/security/ADMIN-BOOTSTRAP.md`](../security/ADMIN-BOOTSTRAP.md)).
 
 ## 6. Règles métier et paie
 

@@ -492,9 +492,13 @@ else
         # suivantes doivent utiliser le compte runtime défini dans le .env.
         unset DB_USERNAME DB_PASSWORD
 
-        # 3. Ne sortir de maintenance que si chaque vérification et optimisation
+        # 3. Synchroniser le référentiel RBAC (rôles/permissions uniquement,
+        #    aucun utilisateur ni secret), puis vider le cache Spatie.
+        #    Ne sortir de maintenance que si chaque vérification et optimisation
         #    réussit. En cas d'échec, l'application reste en maintenance.
-        if php artisan migrate:status &&
+        if php artisan db:seed --class=RbacSeeder --force &&
+           php artisan permission:cache-reset &&
+           php artisan migrate:status &&
            php artisan optimize &&
            php artisan filament:optimize &&
            php artisan queue:restart; then
@@ -521,6 +525,10 @@ fi
 - `php artisan queue:restart` est à conserver si des workers sont actifs.
 - Aucun déploiement automatique n'est configuré : cette procédure est exécutée
   manuellement par l'administrateur.
+- Après la synchronisation RBAC, l'initialisation du premier administrateur est
+  une opération manuelle : `php artisan batipaie:admin-invite` (voir
+  [`docs/security/ADMIN-BOOTSTRAP.md`](../security/ADMIN-BOOTSTRAP.md)). Ne pas
+  l'automatiser dans le déploiement.
 
 ---
 
@@ -543,6 +551,7 @@ fi
 | `CACHE_STORE` | `database` | `array` | `database` | |
 | `QUEUE_CONNECTION` | `database` | `sync` | `database` | Worker requis en prod |
 | `MAIL_MAILER` | `log` | `array` | `smtp` | |
+| `ADMIN_INVITATION_EXPIRY_HOURS` | `24` | `24` | `24` | Durée de l'invitation administrateur |
 | `LOG_LEVEL` | `debug` | `debug` | `warning` | |
 
 Les variables non listées (Redis, AWS, Memcached, Slack, etc.) sont optionnelles
@@ -572,6 +581,8 @@ jamais de sa valeur.*
 - [ ] `php artisan config:clear`
 - [ ] Mot de passe `batipaie_deploy` saisi sans affichage (`read -s`), puis `php artisan migrate --force` (§4.4.2)
 - [ ] `unset DB_USERNAME DB_PASSWORD` effectué après la migration
+- [ ] `php artisan db:seed --class=RbacSeeder --force` (rôles/permissions uniquement, aucun utilisateur)
+- [ ] `php artisan permission:cache-reset`
 - [ ] `php artisan optimize` + `php artisan filament:optimize` avec les identifiants runtime du `.env`
 - [ ] `php artisan migrate:status` (contrôle lecture seule)
 - [ ] `php artisan queue:restart`
@@ -580,6 +591,7 @@ jamais de sa valeur.*
 **Après**
 
 - [ ] Page de connexion Filament accessible en HTTPS.
+- [ ] Invitation du premier administrateur via `php artisan batipaie:admin-invite` (procédure manuelle, voir `docs/security/ADMIN-BOOTSTRAP.md`).
 - [ ] Cookie de session marqué `Secure` (vérification navigateur).
 - [ ] `storage/logs` sans erreur critique.
 - [ ] Tâche cron exécutée (`schedule:list`, logs).

@@ -37,6 +37,7 @@ herd secure           # optionnel : HTTPS local
 | Objectif | Commande |
 |---|---|
 | Serveur de développement complet | `composer dev` |
+| Invitation du premier administrateur | `php artisan batipaie:admin-invite` |
 | Frontend seul | `npm run dev` / `npm run build` |
 | Tests | `vendor/bin/pest` ou `composer test` |
 | Formatage (vérification) | `vendor/bin/pint --test` |
@@ -54,6 +55,8 @@ herd secure           # optionnel : HTTPS local
   local, test et production (Ubuntu, aaPanel, Nginx, MySQL, Cron, Supervisor).
 - [`docs/development/TESTING.md`](docs/development/TESTING.md) — conventions et commandes de test.
 - [`docs/development/WORKFLOW.md`](docs/development/WORKFLOW.md) — branches, PR, releases.
+- [`docs/security/RBAC.md`](docs/security/RBAC.md) — rôles, permissions, synchronisation et accès au panel.
+- [`docs/security/ADMIN-BOOTSTRAP.md`](docs/security/ADMIN-BOOTSTRAP.md) — invitation et création du premier administrateur.
 - [`AGENTS.md`](AGENTS.md) — règles de travail du dépôt.
 
 ## Sécurité
